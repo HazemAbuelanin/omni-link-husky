@@ -102,9 +102,24 @@ Key simulation constants are defined at the top of both simulator entry points (
 
 To get started with the omnilink bridge: 
 
-1-Configure and Start the MQTT Broker (Mosquitto)
+Phase 1: Environment Setup (The Backend)
 
-The OmniLink Agent UI requires the WebSockets protocol on port 9001. Standard Mosquitto defaults to TCP on port 1883, which causes connection failures.
+This phase establishes the local server and the necessary communication protocols.
+
+1. Start the Husky Fleet Simulator (Flask API)
+
+    Navigate to the root directory of the repository (omni-link-husky-fleet/).
+
+    Run the simulator:
+    Bash
+
+    python husky_fleet.py
+
+    (Terminal 1): This terminal must remain open. The Flask API runs on http://127.0.0.1:5000 and defaults to controlling husky_0.
+
+2. Configure and Start the MQTT Broker (Mosquitto)
+
+The OmniLink Agent UI requires the WebSockets protocol on port 9001.
 
     Stop the Default Service: Ensure no background instance is blocking the port.
     Bash
@@ -116,7 +131,7 @@ Bash
 
 sudo nano /etc/mosquitto/mosquitto.conf
 
-Add/Verify Configuration: Ensure the following lines are present to allow the required protocol and port, and to prevent the rc=5 (Not Authorised) connection error.
+Add/Verify Configuration: Ensure the following lines are present to enable the required protocol and port, and to prevent the authentication error (rc=5).
 Code snippet
 
 allow_anonymous true # CRITICAL: Allows connection from the local bridge client
@@ -132,13 +147,13 @@ Bash
 
 3. Launch the OmniLink Bridge Script
 
-The Python script receives MQTT messages and translates them into Flask API calls.
+The Python script receives MQTT messages and translates them into Flask API calls for husky_0.
 
-    Set Environment Variables: These tell the bridge script which robot API to talk to.
+    Set Environment Variables:
     Bash
 
 export HUSKY_API_URL=http://127.0.0.1:5000
-export HUSKY_ROBOT_ID=husky_0 # Default target robot
+export HUSKY_ROBOT_ID=husky_0 # Set the single robot target
 
 Navigate to Bridge Directory:
 Bash
@@ -150,42 +165,37 @@ Bash
 
     python link_mqtt.py
 
-    (Terminal 3): A successful connection will show: [OmniLinkMQTT] Connected localhost:9001 (transport=websockets). This terminal now remains open and idle, waiting for commands.
+    (Terminal 3): A successful connection will show: [OmniLinkMQTT] Connected localhost:9001 (transport=websockets).
 
-Phase 2: OmniLink Agent Configuration
+Phase 2: OmniLink Agent Configuration (Revised Templates)
 
-The final step is to configure the web UI (Agent) to publish commands to your running local environment.
+In the OmniLink UI website, you must use the simplified templates provided below.
 
 1. Configure Connection Settings
 
-In the OmniLink UI, navigate to the Connection Settings and verify the following fields to match your broker setup:
-Setting	Value	CRITICAL NOTE
-BROKER/WEBSOCKET URL	ws://localhost:9001	Must use the ws:// protocol and port 9001.
-COMMAND TOPIC	olink/commands	This must match the topic the bridge script is subscribing to.
+In the OmniLink UI, navigate to the Connection Settings and verify the following fields:
 
-2. Define Command Templates (Crucial Syntax Fix)
+    BROKER/WEBSOCKET URL: ws://localhost:9001
 
-The AI Agent must generate commands that exactly match the simplified placeholders expected by the Python bridge script. Avoid using full units like meters_per_second.
-Action	Recommended Template to Enter in OmniLink UI
-Drive Command	drive_[robot_id]_[direction]_[speed]_[duration]
-Turn Command	turn_[robot_id]_[direction]_[rate]_[duration]
-Stop Command	stop_[robot_id]
-Reset Fleet	reset_fleet
+    COMMAND TOPIC: olink/commands
+
+2. Define Command Templates
+
+Go to Settings → Commands and enter only these five templates. The simplified structure guarantees an exact match with the Python code, as the variables ([number]) are separated by underscores or the unit shorthand (m/s, rad/s).
+Action	Single-Robot Template
+Move Forward	move_forward_at_[number]_m/s_for_[number]_seconds
+Move Backward	move_backward_at_[number]_m/s_for_[number]_seconds
+Turn Right	turn_right_at_[number]_rad/s_for_[number]_seconds
+Turn Left	turn_left_at_[number]_rad/s_for_[number]_seconds
+Stop	stop
 
 3. Test the End-to-End Control Loop
 
-    In the OmniLink UI (voice or text), issue a simplified command that matches the template:
+    In the OmniLink UI (voice or text), issue a command that forces the LLM to use the template structure:
 
-        "Husky zero, move forward at zero point five, for three."
+        "Move forward at 0.5 m/s for 3 seconds." (The Agent should generate the string: move_forward_at_0.5_m/s_for_3_seconds)
 
-    Verification: Observe the command flow:
-
-        UI Status: Last Command shows the simple string (e.g., drive_husky_0_forward_0.5_3).
-
-        Bridge Terminal (T3): Logs the incoming command string and the successful translation (no "did not match" error).
-
-        Simulation (T1/GUI): The husky_0 robot moves forward in the PyBullet window.
-
+    Verification: The robot will move and the bridge terminal will log the successful event match.
 ## Project Structure
 
 ```
