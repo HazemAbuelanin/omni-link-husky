@@ -100,78 +100,67 @@ Key simulation constants are defined at the top of both simulator entry points (
 - **Agent Personality:** friendly, professional
 - **Custom Instructions:** none
 
-To get started with the omnilink bridge: 
+## 🔗 OmniLink Bridge Setup (MQTT → Simulator Control)
 
-Phase 1: Environment Setup (The Backend)
+This section explains how to connect the **OmniLink Agent UI** (web UI) with the **Husky Fleet Simulator** by using **MQTT**. The OmniLink UI communicates over **WebSockets**, so we must configure Mosquitto to support `protocol websockets` on port **9001**.
 
-This phase establishes the local server and the necessary communication protocols.
+---
 
-1. Start the Husky Fleet Simulator (Flask API)
+### 1) Configure & Start the Mosquitto Broker
 
-    Navigate to the root directory of the repository (omni-link-husky-fleet/).
+The default Mosquitto broker listens on `1883` (TCP only), which **will not work** with the OmniLink UI.  
+We must enable **WebSockets** on port **9001**.
 
-    Run the simulator:
-    Bash
-
-    python husky_fleet.py
-
-    (Terminal 1): This terminal must remain open. The Flask API runs on http://127.0.0.1:5000 and defaults to controlling husky_0.
-
-2. Configure and Start the MQTT Broker (Mosquitto)
-
-The OmniLink Agent UI requires the WebSockets protocol on port 9001.
-
-    Stop the Default Service: Ensure no background instance is blocking the port.
-    Bash
-
+#### Stop any running Mosquitto instance:
+```bash
 sudo systemctl stop mosquitto.service
-
-Enable WebSockets: Edit the main Mosquitto configuration file.
-Bash
-
+```
+Edit the Mosquitto configuration:
+```bash
 sudo nano /etc/mosquitto/mosquitto.conf
-
-Add/Verify Configuration: Ensure the following lines are present to enable the required protocol and port, and to prevent the authentication error (rc=5).
-Code snippet
-
-allow_anonymous true # CRITICAL: Allows connection from the local bridge client
+```
+Add (or verify) these lines:
+```bash
+allow_anonymous true      # Required for local UI connections (avoid rc=5 auth errors)
 listener 9001
-protocol websockets # CRITICAL: Required to match the OmniLink UI setting (ws://...)
+protocol websockets       # Enables ws:// communication required by the OmniLink UI
+```
 
-Start the Broker Service:
-Bash
+Note: Using allow_anonymous true is acceptable for local development.
+For production use, configure authentication.
 
-    sudo systemctl start mosquitto.service
+Restart the broker:
 
-    (Terminal 2): The broker is now listening correctly.
+```bash
+sudo systemctl start mosquitto.service
+```
 
-3. Launch the OmniLink Bridge Script
+✅ Verification:
 
-The Python script receives MQTT messages and translates them into Flask API calls for husky_0.
+Run in another terminal:
+```bash
+sudo netstat -tulpn | grep 9001
+```
+You should see Mosquitto listening on port 9001 (websockets).
 
-    Set Environment Variables:
-    Bash
+2) Launch the OmniLink Bridge
 
-export HUSKY_API_URL=http://127.0.0.1:5000
-export HUSKY_ROBOT_ID=husky_0 # Set the single robot target
+This script receives messages from the OmniLink UI via MQTT and converts them into REST API calls to control the robots.
 
-Navigate to Bridge Directory:
-Bash
-
+```bash
+export HUSKY_API_URL=http://127.0.0.1:5000     # Address of the simulator REST API
+```
+Run the bridge:
+```bash
 cd robot_link/
-
-Run the Bridge:
-Bash
-
-    python link_mqtt.py
-
-    (Terminal 3): A successful connection will show: [OmniLinkMQTT] Connected localhost:9001 (transport=websockets).
-
-Phase 2: OmniLink Agent Configuration (Revised Templates)
-
-In the OmniLink UI website, you must use the simplified templates provided below.
-
-1. Configure Connection Settings
+python link_mqtt.py
+```
+Expected output:
+```bash
+[OmniLinkMQTT] Connected to localhost:9001 (transport=websockets)
+```
+Leave this terminal running.
+It listens for control messages.
 
 In the OmniLink UI, navigate to the Connection Settings and verify the following fields:
 
