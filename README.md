@@ -12,8 +12,6 @@ This project provides a lightweight Python application for driving a Clearpath H
 
 ## Requirements
 
-# Requirements
-
 ## Python Version
 Python 3.10 or Python 3.11
 
